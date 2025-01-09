@@ -57,3 +57,6 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
             detail="You do not have access to this resource"
         )
     return current_user
+
+def get_password_hash(password):
+    return pwd_context.hash(password)

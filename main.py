@@ -2,7 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from schemas import ProductCreate, OrderCreate
-from utils import authenticate_user, create_access_token, get_current_admin_user, get_current_user, get_db
+from utils import authenticate_user, create_access_token, get_current_admin_user, get_current_user, get_db, \
+    get_password_hash
 from db import engine, Base
 from models import User, Product, Order, OrderDetail
 
@@ -28,6 +29,39 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.post("/register", status_code=status.HTTP_201_CREATED)
+async def register_user(
+        username: str,
+        fullname: str,
+        password: str,
+        email: str,
+        role: str,
+        db: Session = Depends(get_db)
+):
+
+    allowed_roles = ["customer"]
+
+    if role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role. Allowed roles are: {', '.join(allowed_roles)}"
+        )
+
+    existing_user = db.query(User).filter((User.username == username) | (User.email == email)).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered"
+        )
+
+    hashed_password = get_password_hash(password)
+
+    new_user = User(username=username,  hashed_password=hashed_password, email=email, role=role)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"detail": "User registered successfully"}
 
 # Admin Endpoints
 @admin_router.post("/products", response_model=ProductCreate)
