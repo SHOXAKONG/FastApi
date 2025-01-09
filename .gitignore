@@ -1,5 +1,12 @@
 app.py
 venv
 .idea
+<<<<<<< HEAD
 *.pyc
 __pycache__/
+=======
+
+*.pyc
+__pycache__/
+
+>>>>>>> origin/main
