@@ -137,9 +137,24 @@ async def create_order(
         )
         db.add(order_detail)
     db.commit()
+    db.refresh(new_order)  # Refresh to include relationships
 
-    # Return Response
-    return new_order
+
+    return {
+        "id": new_order.id,
+        "customer_id": new_order.customer_id,
+        "status": new_order.status,
+        "details": [
+            {
+                "product_id": detail.product_id,
+                "quantity": detail.quantity,
+                "product_name": detail.product.name,
+                "product_price": detail.product.price
+            } for detail in new_order.order_details
+        ]
+    }
+
+
 
 @app.get("/customer/orders/{customerId}")
 async def read_customer_orders(
