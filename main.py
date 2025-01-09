@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from schemas import ProductCreate, OrderCreate
@@ -9,6 +9,12 @@ from models import User, Product, Order, OrderDetail
 app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
+
+admin_router = APIRouter(
+    prefix="/admin",
+    tags=["Admin"]
+)
+
 
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -22,12 +28,13 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 # Admin Endpoints
-@app.post("/admin/products", response_model=ProductCreate)
+@admin_router.post("/products", response_model=ProductCreate)
 async def create_product(
-    product: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        product: ProductCreate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     new_product = Product(**product.dict())
     db.add(new_product)
@@ -35,23 +42,25 @@ async def create_product(
     db.refresh(new_product)
     return new_product
 
-@app.get("/admin/products/{id}", response_model=ProductCreate)
+
+@admin_router.get("/products/{id}", response_model=ProductCreate)
 async def read_product(
-    id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     product = db.query(Product).filter(Product.id == id).first()
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
-@app.put("/admin/products/{id}", response_model=ProductCreate)
+
+@admin_router.put("/products/{id}", response_model=ProductCreate)
 async def update_product(
-    id: int,
-    product: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        id: int,
+        product: ProductCreate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     db_product = db.query(Product).filter(Product.id == id).first()
     if db_product is None:
@@ -62,11 +71,12 @@ async def update_product(
     db.refresh(db_product)
     return db_product
 
-@app.delete("/admin/products/{id}")
+
+@admin_router.delete("/products/{id}")
 async def delete_product(
-    id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     db_product = db.query(Product).filter(Product.id == id).first()
     if db_product is None:
@@ -75,19 +85,21 @@ async def delete_product(
     db.commit()
     return {"detail": "Product deleted"}
 
-@app.get("/admin/orders")
+
+@admin_router.get("/orders")
 async def read_orders(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     orders = db.query(Order).all()
     return orders
 
-@app.get("/admin/orders/{id}")
+
+@admin_router.get("/orders/{id}")
 async def read_order(
-    id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+        id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_admin_user)
 ):
     order = db.query(Order).filter(Order.id == id).first()
     if order is None:
@@ -95,18 +107,24 @@ async def read_order(
     return order
 
 
+customer_router = APIRouter(
+    prefix="/customer",
+    tags=["Customer"]
+)
+
 
 # Customer Endpoints
-@app.get("/customer/products")
+@customer_router.get("/products")
 async def read_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return products
 
-@app.post("/customer/orders")
+
+@customer_router.post("/orders")
 async def create_order(
-    order: OrderCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+        order: OrderCreate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
 ):
     # Validate Products
     for product in order.products:
@@ -139,7 +157,6 @@ async def create_order(
     db.commit()
     db.refresh(new_order)  # Refresh to include relationships
 
-
     return {
         "id": new_order.id,
         "customer_id": new_order.customer_id,
@@ -155,22 +172,27 @@ async def create_order(
     }
 
 
-@app.get("/customer/orders/{customerId}")
+@customer_router.get("/orders/{customerId}")
 async def read_customer_orders(
-    customerId: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+        customerId: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
 ):
     orders = db.query(Order).filter(Order.customer_id == customerId).all()
     return orders
 
-@app.get("/customer/orders/{orderId}/status")
+
+@customer_router.get("/orders/{orderId}/status")
 async def read_order_status(
-    orderId: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+        orderId: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
 ):
     order = db.query(Order).filter(Order.id == orderId).first()
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")
     return {"status": order.status}
+
+
+app.include_router(admin_router)
+app.include_router(customer_router)
