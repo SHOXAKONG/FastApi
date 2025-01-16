@@ -56,7 +56,7 @@ async def register_user(
 
     hashed_password = get_password_hash(password)
 
-    new_user = User(username=username,  hashed_password=hashed_password, email=email, role=role)
+    new_user = User(username=username, full_name=fullname, hashed_password=hashed_password, email=email, role=role)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
